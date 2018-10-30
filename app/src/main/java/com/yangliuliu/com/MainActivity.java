@@ -3,9 +3,12 @@ package com.yangliuliu.com;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AlertDialog;
@@ -20,6 +23,9 @@ import com.pgyersdk.update.PgyUpdateManager;
 import com.yhao.floatwindow.FloatWindow;
 import com.yhao.floatwindow.IFloatWindow;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
@@ -28,6 +34,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Button mBtnClose;
     private Button mBtnIntroduce;
     private Button mBtnSupport;
+    private Button mBtnShare;
+    private Button mBtnSharePic;
     private static final String TAG = "FloatWindow";
     private TextView mTvTime;
     private TextView mTvCopy;
@@ -53,6 +61,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mBtnOpen = (Button) findViewById(R.id.btn_open);
         mBtnClose = (Button) findViewById(R.id.btn_close);
         mBtnIntroduce = (Button) findViewById(R.id.btn_introduce);
+        mBtnShare = (Button) findViewById(R.id.btn_share);
+        mBtnSharePic = (Button) findViewById(R.id.btn_share_pic);
         mTvCopy = (TextView) findViewById(R.id.tv_copy);
         mBtnSupport = (Button) findViewById(R.id.btn_support);
         mBtnOpen.setOnClickListener(this);
@@ -60,10 +70,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mBtnIntroduce.setOnClickListener(this);
         mBtnSupport.setOnClickListener(this);
         mTvCopy.setOnClickListener(this);
-
+        mBtnShare.setOnClickListener(this);
+        mBtnSharePic.setOnClickListener(this);
 
         new PgyUpdateManager.Builder()
-                .setForced(false)                //设置是否强制更新
+                .setForced(true)                //设置是否强制更新
                 .setUserCanRetry(true)         //失败后是否提示重新下载
                 .setDeleteHistroyApk(true)     // 检查更新前是否删除本地历史 Apk
                 .register();
@@ -121,6 +132,35 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 break;
 
+            case R.id.btn_share:
+
+                new AlertDialog.Builder(this)
+                        .setTitle("好东西要一起分享哦")
+                        .setMessage("下载链接已复制到剪切板,请直接黏贴发送给好友哦~~~~")
+                        .setPositiveButton("去黏贴", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                Toast.makeText(MainActivity.this, "下载链接复制成功", Toast.LENGTH_SHORT).show();
+                            }
+                        })
+                        .create().show();
+
+
+                ClipboardManager copy = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                copy.setText("https://www.pgyer.com/ZZVK");
+
+                break;
+            case R.id.btn_share_pic:
+
+                if (saveImageToGallery(this, BitmapFactory.decodeResource(getResources(), R.drawable.share_pic))) {
+                    Toast.makeText(this, "保存成功", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "保存失败,请用分享链接", Toast.LENGTH_SHORT).show();
+                }
+
+                break;
+
+
         }
     }
 
@@ -143,6 +183,46 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private String format() {
         SimpleDateFormat format = new SimpleDateFormat("HH:mm:ss:SSS");
         return format.format(System.currentTimeMillis());
+    }
+
+
+    //保存文件到指定路径
+    public static boolean saveImageToGallery(Context context, Bitmap bmp) {
+        // 首先保存图片
+        String storePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsolutePath();
+        File appDir = new File(storePath);
+        if (!appDir.exists()) {
+            appDir.mkdir();
+        }
+        String fileName = "shareFriends.png";
+        File file = new File(appDir, fileName);
+
+        if (file.exists()) {
+            return true;
+        }
+
+        try {
+            FileOutputStream fos = new FileOutputStream(file);
+            //通过io流的方式来压缩保存图片
+            boolean isSuccess = bmp.compress(Bitmap.CompressFormat.JPEG, 60, fos);
+            fos.flush();
+            fos.close();
+
+            //把文件插入到系统图库
+            //MediaStore.Images.Media.insertImage(context.getContentResolver(), file.getAbsolutePath(), fileName, null);
+
+            //保存图片后发送广播通知更新数据库
+            Uri uri = Uri.fromFile(file);
+            context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri));
+            if (isSuccess) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
 
